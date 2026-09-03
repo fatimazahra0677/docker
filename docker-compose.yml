@@ -1,96 +1,75 @@
-# version is now using "compose spec"
-# v2 and v3 are now combined!
-# docker-compose v1.27+ required
-
 services:
-  vote:
-    build: 
-      context: ./vote
-      target: dev
-    depends_on:
-      redis:
-        condition: service_healthy
-    healthcheck: 
-      test: ["CMD", "curl", "-f", "http://localhost"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    volumes:
-     - ./vote:/usr/local/app
+  nginx:
+    build: ./nginx  #construire l 'image Docker à partir du dossier ./nginx'
     ports:
-      - "8080:80"
+      - "80:80"
     networks:
-      - front-tier
-      - back-tier
+      fr-net:
+        ipv4_address: 172.20.1.10
+    depends_on: #Docker Compose doit démarrer vote et result avant de démarrer nginx.
+      - vote
+      - result
+
+  vote:
+    build: ./vote
+    expose:
+      - "80"
+    networks:
+      fr-net:
+        ipv4_address: 172.20.1.20
+    user: "999:999"
 
   result:
     build: ./result
-    # use nodemon rather than node for local dev
-    entrypoint: nodemon --inspect=0.0.0.0 server.js
-    depends_on:
-      db:
-        condition: service_healthy 
-    volumes:
-      - ./result:/usr/local/app
-    ports:
-      - "8081:80"
-      - "127.0.0.1:9229:9229"
+    expose:
+      - "80"
     networks:
-      - front-tier
-      - back-tier
-
-  worker:
-    build:
-      context: ./worker
-    depends_on:
-      redis:
-        condition: service_healthy 
-      db:
-        condition: service_healthy 
-    networks:
-      - back-tier
+      fr-net:
+        ipv4_address: 172.20.1.30
+    user: "999:999"
 
   redis:
     image: redis:alpine
-    volumes:
-      - "./healthchecks:/healthchecks"
-    healthcheck:
-      test: /healthchecks/redis.sh
-      interval: "5s"
     networks:
-      - back-tier
+      bk-net:
+        ipv4_address: 172.20.2.10
+    user: "999:999"
+
+  worker:
+    build: ./worker
+    networks:
+      bk-net:
+        ipv4_address: 172.20.2.20
+    user: "999:999"
 
   db:
     image: postgres:15-alpine
+    networks:
+      db-net:
+        ipv4_address: 172.20.3.10
     environment:
-      POSTGRES_USER: "postgres"
-      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - "db-data:/var/lib/postgresql/data"
-      - "./healthchecks:/healthchecks"
-    healthcheck:
-      test: /healthchecks/postgres.sh
-      interval: "5s"
-    networks:
-      - back-tier
+      - db-data:/var/lib/postgresql/data
 
-  # this service runs once to seed the database with votes
-  # it won't run unless you specify the "seed" profile
-  # docker compose --profile seed up -d
-  seed:
-    build: ./seed-data
-    profiles: ["seed"]
-    depends_on:
-      vote:
-        condition: service_healthy 
-    networks:
-      - front-tier
-    restart: "no"
+networks:
+  fr-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.1.0/24
+  bk-net:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.20.2.0/24
+  db-net:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.20.3.0/24
 
 volumes:
   db-data:
-
-networks:
-  front-tier:
-  back-tier:
