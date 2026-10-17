@@ -1,23 +1,28 @@
+
 services:
   nginx:
-    build: ./nginx  #construire l 'image Docker à partir du dossier ./nginx'
+    build: ./nginx
     ports:
       - "80:80"
     networks:
       fr-net:
         ipv4_address: 172.20.1.10
-    depends_on: #Docker Compose doit démarrer vote et result avant de démarrer nginx.
+    depends_on:
       - vote
       - result
 
   vote:
-    build: ./vote
+    build:
+      context: ./vote
+      target: final
     expose:
       - "80"
     networks:
       fr-net:
         ipv4_address: 172.20.1.20
     user: "999:999"
+    extra_hosts:
+      - "redis:172.20.2.10"
 
   result:
     build: ./result
@@ -27,6 +32,10 @@ services:
       fr-net:
         ipv4_address: 172.20.1.30
     user: "999:999"
+    extra_hosts:
+      - "db:172.20.3.10"
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
 
   redis:
     image: redis:alpine
@@ -41,6 +50,8 @@ services:
       bk-net:
         ipv4_address: 172.20.2.20
     user: "999:999"
+    extra_hosts:
+      - "db:172.20.3.10"
 
   db:
     image: postgres:15-alpine
@@ -58,12 +69,13 @@ networks:
     ipam:
       config:
         - subnet: 172.20.1.0/24
+
   bk-net:
     driver: bridge
-    internal: true
     ipam:
       config:
         - subnet: 172.20.2.0/24
+
   db-net:
     driver: bridge
     internal: true
