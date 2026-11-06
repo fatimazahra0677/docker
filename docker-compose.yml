@@ -63,6 +63,37 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
 
+  firewall-init:
+    image: justincormack/nsenter1
+    privileged: true
+    pid: host
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - vote
+      - redis
+      - worker
+      - db
+      - result
+    entrypoint: ["/usr/bin/nsenter1"]
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+
+        iptables -C DOCKER-USER -s 172.20.1.20 -d 172.20.2.10 -p tcp --dport 6379 -j ACCEPT 2>/dev/null || iptables -I DOCKER-USER -s 172.20.1.20 -d 172.20.2.10 -p tcp --dport 6379 -j ACCEPT
+
+        iptables -C DOCKER-USER -s 172.20.2.20 -d 172.20.3.10 -p tcp --dport 5432 -j ACCEPT 2>/dev/null || iptables -I DOCKER-USER -s 172.20.2.20 -d 172.20.3.10 -p tcp --dport 5432 -j ACCEPT
+
+        iptables -C DOCKER-USER -s 172.20.1.30 -d 172.20.3.10 -p tcp --dport 5432 -j ACCEPT 2>/dev/null || iptables -I DOCKER-USER -s 172.20.1.30 -d 172.20.3.10 -p tcp --dport 5432 -j ACCEPT
+
+        iptables -C DOCKER-USER -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || iptables -I DOCKER-USER -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+        echo "Firewall rules initialized successfully"
+
+        while true; do sleep 3600; done
+
 networks:
   fr-net:
     driver: bridge

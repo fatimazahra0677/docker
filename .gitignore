@@ -1,1 +1,25 @@
-﻿.env
+﻿# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Private keys and certificates
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+
+# Temporary files
+*.log
+.DS_Store
+
+# Local Git clone (do not publish)
+docker/
+
+# Local firewall backup
+documentation/iptables-before-cleanup.rules
+# Private internship report - keep local
+Rapport_stage_initiation_LaTeX.pdf
+# Local README backup
+README-original.md
